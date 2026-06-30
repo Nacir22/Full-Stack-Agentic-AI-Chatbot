@@ -1,0 +1,34 @@
+# ==========================================================================
+# Dépendances backend — installées de façon incrémentale au fil des phases.
+# Phase 1 : socle FastAPI + configuration + tests.
+# Les blocs commentés seront activés à leur phase (DB, agent, RAG...).
+# ==========================================================================
+
+# --- Phase 1 : API & configuration ---
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.1
+
+# --- Tests (toutes phases) ---
+pytest==8.3.4
+pytest-asyncio==0.25.0     # tests async (sessions DB)
+httpx==0.28.1              # client de test pour FastAPI TestClient
+
+# --- Phase 2 : base de données ---
+sqlalchemy[asyncio]==2.0.36
+alembic==1.14.0
+psycopg[binary]==3.2.3       # driver PostgreSQL (sync + async)
+aiosqlite==0.20.0            # driver SQLite async (dev)
+
+# --- Phase 3 : agent & LLM ---
+langgraph==0.2.60
+langchain-openai==0.2.14      # client ChatOpenAI (et compatible Ollama)
+langchain-mistralai==0.2.4    # client ChatMistralAI
+langsmith==0.2.10             # tracing (activé via env)
+
+# --- Phase 5 : RAG (à activer) ---
+# langchain==0.3.13            # loaders / text splitters
+# chromadb==0.5.23
+# langchain-chroma==0.1.4
+# pypdf==5.1.0

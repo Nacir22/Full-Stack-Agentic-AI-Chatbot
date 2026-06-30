@@ -1,0 +1,13 @@
+[
+  "tests/test_chat.py::test_chat_creates_conversation",
+  "tests/test_chat.py::test_chat_persists_and_continues_conversation",
+  "tests/test_chat.py::test_chat_unknown_conversation_returns_404",
+  "tests/test_chat.py::test_empty_message_rejected",
+  "tests/test_chat.py::test_list_conversations",
+  "tests/test_health.py::test_health_root",
+  "tests/test_health.py::test_health_v1",
+  "tests/test_health.py::test_openapi_available",
+  "tests/test_models.py::test_cascade_delete",
+  "tests/test_models.py::test_conversation_with_messages",
+  "tests/test_models.py::test_user_relationship"
+]

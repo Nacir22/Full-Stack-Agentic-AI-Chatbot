@@ -1,0 +1,6 @@
+{
+  "tests/test_chat.py::test_chat_creates_conversation": true,
+  "tests/test_chat.py::test_chat_persists_and_continues_conversation": true,
+  "tests/test_chat.py::test_list_conversations": true,
+  "tests/test_chat.py::test_empty_message_rejected": true
+}
