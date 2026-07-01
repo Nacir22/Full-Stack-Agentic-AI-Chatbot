@@ -14,11 +14,10 @@
   <img alt="AWS" src="https://img.shields.io/badge/AWS-ECR%20%7C%20EC2-FF9900?logo=amazonaws&logoColor=white">
 </p>
 
-> **Statut : Phase 6 — Agent outillé (tool calling) en place.** L'agent décide
-> d'appeler des outils (`rag_search`, mémoire, API externe) via un routage
-> conditionnel LangGraph, avec gestion d'erreurs. 30 tests verts (LLM/embeddings
-> simulés). Prochaine étape : frontend Next.js
-> (voir la [roadmap](#22-améliorations-futures--roadmap)).
+> **Statut : Phase 7 — Frontend Next.js en place.** Interface de chat complète
+> (messages, historique, upload de documents, erreurs, loading) branchée sur
+> l'API via un service isolé. Backend : 30 tests verts. Prochaine étape :
+> dockerisation (voir la [roadmap](#22-améliorations-futures--roadmap)).
 
 ---
 
@@ -214,7 +213,17 @@ curl http://localhost:8000/health
 
 Raccourci : `./scripts/run_backend_local.sh` (crée le venv, installe, lance).
 
-**Frontend** — _à compléter en Phase 7._
+**Frontend (Phase 7 — disponible).**
+
+```bash
+cd frontend
+cp .env.local.example .env.local
+npm install
+npm run dev
+```
+
+- UI : http://localhost:3000 (le backend doit tourner sur le port 8000).
+- Configuration : `NEXT_PUBLIC_API_BASE_URL` dans `.env.local`.
 
 ## 11. Lancement avec Docker
 
@@ -455,9 +464,27 @@ vecteurs (`204`), `404` si introuvable.
 
 ## 16. Frontend expliqué
 
-> _À compléter en Phase 7._ Interface Next.js : zone de chat, messages
-> user/assistant, état de chargement, historique, upload de documents, gestion
-> d'erreurs, design responsive. Communication avec FastAPI via un service API isolé.
+Interface **Next.js (App Router) + TypeScript + Tailwind**. Toute la
+communication avec le backend passe par un **service API isolé**
+(`src/services/api.ts`) : l'UI ne connaît jamais les URLs en dur.
+
+Architecture des composants :
+
+- `ChatApp.tsx` — composant principal : gère l'état (conversations, messages,
+  documents), le chargement et les erreurs, orchestre les appels API.
+- `MessageBubble.tsx` — bulle de message (présentation).
+- `Composer.tsx` — saisie et envoi.
+- `Sidebar.tsx` — historique des conversations + upload/suppression de documents.
+
+Fonctionnalités : chat user/assistant, état de chargement, reprise d'un fil
+existant, upload de documents (.txt/.md/.pdf) pour le RAG, affichage des erreurs.
+Détails et lancement : [`frontend/README.md`](frontend/README.md).
+
+```mermaid
+graph LR
+    UI[ChatApp / Composer / Sidebar] --> SVC[services/api.ts]
+    SVC -->|HTTP JSON| API[FastAPI /api/v1]
+```
 
 ## 17. Tests
 
@@ -503,7 +530,7 @@ La couverture s'étend à chaque phase (services, RAG, tools, agent).
 | **4 ✅** | Mémoire conversationnelle |
 | **5 ✅** | RAG ChromaDB |
 | **6 ✅** | Tools agentiques + tool calling |
-| 7 | Frontend Next.js |
+| **7 ✅** | Frontend Next.js |
 | 8 | Dockerisation |
 | 9 | Tests & qualité |
 | 10 | Monitoring LangSmith |
