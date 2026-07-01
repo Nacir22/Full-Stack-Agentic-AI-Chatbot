@@ -17,7 +17,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # config.py -> core -> app -> backend -> racine du dépôt
@@ -69,6 +69,12 @@ class Settings(BaseSettings):
     RAG_CHUNK_OVERLAP: int = 150
     RAG_TOP_K: int = 4
 
+    # --- Mémoire conversationnelle ----------------------------------------
+    # window  : ne garde que les N derniers messages (rapide, sans coût LLM).
+    # summary : résume les messages les plus anciens et garde les N récents.
+    MEMORY_STRATEGY: Literal["window", "summary"] = "window"
+    MEMORY_WINDOW_SIZE: int = 10  # nb de messages récents conservés tels quels
+
     @field_validator("BACKEND_CORS_ORIGINS")
     @classmethod
     def _strip_origins(cls, v: str) -> str:
@@ -76,7 +82,7 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins(self) -> list[str]:
-        """Liste des origines autorisées (séparées par des virgules dans .env)."""
+        """Liste des origines autorisees (separees par des virgules dans .env)."""
         return [o.strip() for o in self.BACKEND_CORS_ORIGINS.split(",") if o.strip()]
 
     @property

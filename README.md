@@ -14,10 +14,10 @@
   <img alt="AWS" src="https://img.shields.io/badge/AWS-ECR%20%7C%20EC2-FF9900?logo=amazonaws&logoColor=white">
 </p>
 
-> **Statut : Phase 3 — Agent LangGraph + `/chat` en place.** L'agent (graphe
-> LangGraph) répond via un LLM multi-fournisseur configurable, persiste les
-> messages et recharge l'historique. 11 tests verts (LLM simulé). Prochaine
-> étape : mémoire conversationnelle enrichie
+> **Statut : Phase 5 — Pipeline RAG (ChromaDB) en place.** Upload de documents,
+> extraction/chunking/embeddings, recherche vectorielle et endpoints
+> `/upload` · `/documents`. 23 tests verts (embeddings simulés, sans réseau).
+> Prochaine étape : brancher le RAG comme outil de l'agent (Phase 6)
 > (voir la [roadmap](#22-améliorations-futures--roadmap)).
 
 ---
@@ -304,7 +304,27 @@ rm -f app.db && alembic upgrade head
 
 ## 13. Pipeline RAG expliqué
 
-> _À compléter en Phase 5._ Aperçu : [`docs/rag-pipeline.md`](docs/rag-pipeline.md).
+Le **RAG** permet à l'agent de répondre à partir de **tes documents**. Deux
+temps : l'**ingestion** (upload → extraction → nettoyage → chunking → embeddings
+→ ChromaDB) et la **recherche** (question → chunks les plus proches → contexte).
+
+```mermaid
+graph LR
+    A[Upload Document] --> B[Text Extraction]
+    B --> C[Cleaning]
+    C --> D[Chunking]
+    D --> E[Embeddings]
+    E --> F[ChromaDB]
+    F --> G[Retriever]
+    G --> H[Agent Response]
+```
+
+Chaque chunk porte `document_id` + `chunk_index` et un id vectoriel déterministe
+(`<document_id>:<index>`), ce qui permet de supprimer proprement tous les
+vecteurs d'un document. Les métadonnées (nom, taille, statut, nombre de chunks)
+sont en SQL (`documents`) ; le texte des chunks et leurs embeddings dans Chroma.
+
+Détails, choix et configuration : [`docs/rag-pipeline.md`](docs/rag-pipeline.md).
 
 ## 14. Agent LangGraph expliqué
 
@@ -323,9 +343,33 @@ Le pipeline d'un tour de conversation (service `ChatService`) :
 
 1. retrouver ou créer la conversation ;
 2. enregistrer le message utilisateur ;
-3. recharger l'historique et le convertir au format LangChain (mémoire de base) ;
+3. construire le contexte via le **`MemoryManager`** (Phase 4) ;
 4. exécuter le graphe (`graph.ainvoke`) ;
 5. enregistrer puis renvoyer la réponse de l'assistant.
+
+### Mémoire conversationnelle (Phase 4)
+
+Envoyer tout l'historique à chaque tour coûte cher et finit par dépasser la
+fenêtre de contexte du modèle. Le `MemoryManager` construit le contexte selon
+une stratégie configurable (`MEMORY_STRATEGY`) :
+
+- **`window`** (défaut) — ne garde que les `MEMORY_WINDOW_SIZE` derniers
+  messages. Rapide, sans coût LLM.
+- **`summary`** — au-delà de la fenêtre, **résume** les messages les plus
+  anciens (via le LLM) et conserve les récents tels quels.
+
+Un prompt système ouvre toujours le contexte. La **session** est la conversation
+elle-même : son `conversation_id` regroupe et isole l'historique. Le tri des
+messages est déterministe (timestamps en résolution microseconde).
+
+```mermaid
+graph TD
+    H[Historique complet en base] --> S{strategy ?}
+    S -->|window| W[Système + N derniers messages]
+    S -->|summary + débordement| R[Système + résumé des anciens + N récents]
+    W --> CTX[Contexte envoyé au LLM]
+    R --> CTX
+```
 
 Le **modèle est injecté** (dépendance `get_chat_model`) : en production c'est le
 provider configuré, en test un `FakeListChatModel` déterministe — d'où des tests
@@ -378,7 +422,19 @@ curl -s -X POST http://localhost:8000/api/v1/chat \
 (`{ id, title, created_at, messages: [{ id, role, content, created_at }] }`),
 `404` si introuvable.
 
-Les routes documentaires (`/upload`, `/documents`) arrivent en Phase 5.
+**`POST /api/v1/upload`** (Phase 5) : `multipart/form-data` avec un champ `file`.
+Déclenche l'ingestion RAG et renvoie le document (`201`), `400` si fichier vide.
+
+```bash
+curl -s -X POST http://localhost:8000/api/v1/upload \
+  -F "file=@mon_document.pdf"
+# {"id":"<uuid>","filename":"mon_document.pdf","num_chunks":12,"status":"ready",...}
+```
+
+**`GET /api/v1/documents`** (Phase 5) : liste les documents indexés.
+
+**`DELETE /api/v1/documents/{id}`** (Phase 5) : supprime le document et ses
+vecteurs (`204`), `404` si introuvable.
 
 ## 16. Frontend expliqué
 
@@ -388,12 +444,12 @@ Les routes documentaires (`/upload`, `/documents`) arrivent en Phase 5.
 
 ## 17. Tests
 
-Backend (Phases 1–3 — `/health`, OpenAPI, modèles, agent `/chat` avec LLM simulé) :
+Backend (Phases 1–5 — `/health`, OpenAPI, modèles, agent `/chat`, mémoire, RAG) :
 
 ```bash
 cd backend
 pytest -q
-# 11 passed
+# 23 passed
 ```
 
 Les tests de l'agent utilisent un faux modèle (`FakeListChatModel`) : aucune clé
@@ -427,8 +483,8 @@ La couverture s'étend à chaque phase (services, RAG, tools, agent).
 | **1 ✅** | Backend FastAPI minimal + `/health` + config |
 | **2 ✅** | DB SQLAlchemy + modèles + Alembic |
 | **3 ✅** | Agent LangGraph minimal + `/chat` |
-| 4 | Mémoire conversationnelle |
-| 5 | RAG ChromaDB |
+| **4 ✅** | Mémoire conversationnelle |
+| **5 ✅** | RAG ChromaDB |
 | 6 | Tools agentiques + tool calling |
 | 7 | Frontend Next.js |
 | 8 | Dockerisation |

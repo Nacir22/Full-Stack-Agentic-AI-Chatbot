@@ -27,8 +27,11 @@ langchain-openai==0.2.14      # client ChatOpenAI (et compatible Ollama)
 langchain-mistralai==0.2.4    # client ChatMistralAI
 langsmith==0.2.10             # tracing (activé via env)
 
-# --- Phase 5 : RAG (à activer) ---
-# langchain==0.3.13            # loaders / text splitters
-# chromadb==0.5.23
-# langchain-chroma==0.1.4
-# pypdf==5.1.0
+# --- Phase 5 : RAG ---
+langchain-text-splitters==0.3.4   # chunking (RecursiveCharacterTextSplitter)
+pypdf==5.1.0                      # extraction texte des PDF
+python-multipart==0.0.20         # upload de fichiers (FastAPI UploadFile)
+langchain-chroma==0.1.4          # intégration LangChain <-> ChromaDB
+chromadb==0.5.23                 # base vectorielle
+# Embeddings open-source optionnels (lourds) :
+# langchain-huggingface==0.1.2
