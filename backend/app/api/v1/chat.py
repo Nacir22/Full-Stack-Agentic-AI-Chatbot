@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from langchain_core.language_models import BaseChatModel
+from langchain_core.vectorstores import VectorStore
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.llm import get_chat_model
 from app.db.session import get_db
+from app.rag.store import get_vector_store
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.chat import ChatService, ConversationNotFoundError
 
@@ -19,8 +21,9 @@ async def chat(
     payload: ChatRequest,
     db: AsyncSession = Depends(get_db),
     model: BaseChatModel = Depends(get_chat_model),
+    store: VectorStore = Depends(get_vector_store),
 ) -> ChatResponse:
-    service = ChatService(db, model)
+    service = ChatService(db, model, store=store)
     try:
         conversation, message, answer = await service.handle(
             payload.message, payload.conversation_id

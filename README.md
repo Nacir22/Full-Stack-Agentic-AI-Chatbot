@@ -14,10 +14,10 @@
   <img alt="AWS" src="https://img.shields.io/badge/AWS-ECR%20%7C%20EC2-FF9900?logo=amazonaws&logoColor=white">
 </p>
 
-> **Statut : Phase 5 — Pipeline RAG (ChromaDB) en place.** Upload de documents,
-> extraction/chunking/embeddings, recherche vectorielle et endpoints
-> `/upload` · `/documents`. 23 tests verts (embeddings simulés, sans réseau).
-> Prochaine étape : brancher le RAG comme outil de l'agent (Phase 6)
+> **Statut : Phase 6 — Agent outillé (tool calling) en place.** L'agent décide
+> d'appeler des outils (`rag_search`, mémoire, API externe) via un routage
+> conditionnel LangGraph, avec gestion d'erreurs. 30 tests verts (LLM/embeddings
+> simulés). Prochaine étape : frontend Next.js
 > (voir la [roadmap](#22-améliorations-futures--roadmap)).
 
 ---
@@ -331,13 +331,30 @@ Détails, choix et configuration : [`docs/rag-pipeline.md`](docs/rag-pipeline.md
 Concept : un **graphe d'états** où chaque nœud est une étape et où les arêtes
 (parfois conditionnelles) décident du chemin selon le besoin.
 
-**Version Phase 3 (minimale)** — un seul nœud `agent` qui appelle le LLM :
+**Version Phase 6** — l'agent peut **appeler des outils**, avec routage
+conditionnel : après le nœud `agent`, on va vers `tools` si le LLM a demandé un
+outil, puis on repasse par l'agent ; sinon on termine.
 
 ```mermaid
-graph LR
-    START --> AGENT[Nœud agent<br/>appel LLM]
-    AGENT --> END
+graph TD
+    START --> AGENT[Nœud agent<br/>LLM avec outils]
+    AGENT -->|tool_calls ?| TOOLS[Nœud tools<br/>exécute l'outil]
+    TOOLS --> AGENT
+    AGENT -->|sinon| END
 ```
+
+### Outils disponibles (Phase 6)
+
+| Outil | Rôle |
+|---|---|
+| `rag_search(query)` | Cherche dans les documents indexés (ChromaDB) et renvoie les passages pertinents |
+| `search_conversation(query)` | Retrouve des messages antérieurs de la conversation (mémoire) |
+| `get_weather(latitude, longitude)` | Exemple d'**API externe** : météo via Open-Meteo (sans clé) |
+
+Chaque outil **capture ses erreurs** et renvoie un message au lieu de crasher
+l'agent. Les outils liés au contexte (RAG, mémoire) sont construits **par
+requête** (`app/tools/registry.py`). Si le modèle ne supporte pas le tool calling,
+le graphe retombe proprement sur un agent sans outils.
 
 Le pipeline d'un tour de conversation (service `ChatService`) :
 
@@ -444,12 +461,12 @@ vecteurs (`204`), `404` si introuvable.
 
 ## 17. Tests
 
-Backend (Phases 1–5 — `/health`, OpenAPI, modèles, agent `/chat`, mémoire, RAG) :
+Backend (Phases 1–6 — santé, modèles, agent `/chat`, mémoire, RAG, tools) :
 
 ```bash
 cd backend
 pytest -q
-# 23 passed
+# 30 passed
 ```
 
 Les tests de l'agent utilisent un faux modèle (`FakeListChatModel`) : aucune clé
@@ -485,7 +502,7 @@ La couverture s'étend à chaque phase (services, RAG, tools, agent).
 | **3 ✅** | Agent LangGraph minimal + `/chat` |
 | **4 ✅** | Mémoire conversationnelle |
 | **5 ✅** | RAG ChromaDB |
-| 6 | Tools agentiques + tool calling |
+| **6 ✅** | Tools agentiques + tool calling |
 | 7 | Frontend Next.js |
 | 8 | Dockerisation |
 | 9 | Tests & qualité |
