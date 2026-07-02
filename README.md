@@ -14,10 +14,10 @@
   <img alt="AWS" src="https://img.shields.io/badge/AWS-ECR%20%7C%20EC2-FF9900?logo=amazonaws&logoColor=white">
 </p>
 
-> **Statut : Phase 10 — Monitoring LangSmith.** Tracing automatique (LLM, étapes
-> LangGraph, outils, latences, erreurs), traces étiquetées par `conversation_id`,
-> activable par `.env`. 37 tests backend (~87 %), ruff vert, stack dockerisée.
-> Prochaine étape : déploiement AWS + CI/CD
+> **Statut : Phase 11 — Déploiement AWS + CI/CD.** Workflows GitHub Actions :
+> CI (ruff + pytest + build front) et déploiement (build → push ECR → EC2 →
+> healthcheck). 37 tests backend (~87 %), stack dockerisée, monitoring LangSmith.
+> Prochaine étape : finalisation portfolio
 > (voir la [roadmap](#22-améliorations-futures--roadmap)).
 
 ---
@@ -558,12 +558,35 @@ appelé un outil, latences par nœud, erreurs d'outils) : voir
 
 ## 19. Déploiement AWS
 
-> _À compléter en Phase 11._ Aperçu : [`docs/deployment-aws.md`](docs/deployment-aws.md).
+Un push sur `main` déclenche le build des images, leur push sur **ECR**, puis un
+déploiement **SSH sur EC2** (pull des images + `docker compose up -d`) validé par
+un **healthcheck** sur `/health`.
+
+```mermaid
+graph LR
+    A[git push main] --> B[GitHub Actions]
+    B --> C[docker build backend + frontend]
+    C --> D[push -> AWS ECR]
+    D --> E[SSH EC2]
+    E --> F[docker compose pull + up -d]
+    F --> G[healthcheck /health]
+```
+
+Pré-requis (dépôts ECR, IAM, instance EC2, `docker-compose.prod.yml` + `.env` sur
+la machine) et stratégie de rollback : [`docs/deployment-aws.md`](docs/deployment-aws.md).
 
 ## 20. CI/CD GitHub Actions
 
-> _À compléter en Phase 11._ Pipeline : build Docker → push ECR → pull EC2 →
-> restart container → healthcheck. Fichier cible : `.github/workflows/deploy.yml`.
+Deux workflows dans `.github/workflows/` :
+
+- **`ci.yml`** (push/PR) — `ruff check` + `pytest --cov` (backend) et
+  `npm run build` (frontend). Garde-fou qualité avant tout merge.
+- **`deploy.yml`** (push `main` ou manuel) — build + push ECR (tags `:latest` et
+  `:<sha>`), puis déploiement EC2 avec healthcheck.
+
+Secrets GitHub requis : `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
+`AWS_REGION`, `PUBLIC_API_BASE_URL`, `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`
+(détaillés dans [`docs/deployment-aws.md`](docs/deployment-aws.md)).
 
 ## 21. Problèmes fréquents et solutions
 
@@ -585,7 +608,7 @@ appelé un outil, latences par nœud, erreurs d'outils) : voir
 | **8 ✅** | Dockerisation |
 | **9 ✅** | Tests & qualité |
 | **10 ✅** | Monitoring LangSmith |
-| 11 | Déploiement AWS + CI/CD |
+| **11 ✅** | Déploiement AWS + CI/CD |
 | 12 | Finalisation portfolio |
 
 Pistes au-delà de la v1 : streaming des réponses, authentification

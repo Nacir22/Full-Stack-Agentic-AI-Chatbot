@@ -1,0 +1,71 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  ECR_BACKEND: agentic-chatbot-backend
+  ECR_FRONTEND: agentic-chatbot-frontend
+
+jobs:
+  deploy:
+    name: Build, push to ECR & deploy on EC2
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & push backend image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          TAG: ${{ github.sha }}
+        run: |
+          docker build -t "$REGISTRY/$ECR_BACKEND:$TAG" -t "$REGISTRY/$ECR_BACKEND:latest" ./backend
+          docker push "$REGISTRY/$ECR_BACKEND:$TAG"
+          docker push "$REGISTRY/$ECR_BACKEND:latest"
+
+      - name: Build & push frontend image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_API_BASE_URL="${{ secrets.PUBLIC_API_BASE_URL }}" \
+            -t "$REGISTRY/$ECR_FRONTEND:$TAG" -t "$REGISTRY/$ECR_FRONTEND:latest" ./frontend
+          docker push "$REGISTRY/$ECR_FRONTEND:$TAG"
+          docker push "$REGISTRY/$ECR_FRONTEND:latest"
+
+      - name: Deploy on EC2 via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: REGISTRY
+          script: |
+            set -e
+            REGISTRY="${{ steps.ecr.outputs.registry }}"
+            aws ecr get-login-password --region "${{ secrets.AWS_REGION }}" \
+              | docker login --username AWS --password-stdin "$REGISTRY"
+            cd /opt/agentic-chatbot
+            export REGISTRY
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d
+            echo "Healthcheck..."
+            for i in $(seq 1 15); do
+              if curl -fsS http://localhost:8000/health; then echo " -> OK"; exit 0; fi
+              sleep 4
+            done
+            echo "Healthcheck échoué après déploiement"; exit 1

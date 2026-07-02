@@ -1,0 +1,47 @@
+# Compose de PRODUCTION (sur l'instance EC2).
+# Les images backend/frontend proviennent d'ECR (variable REGISTRY exportée par
+# le workflow de déploiement). La base et le volume Chroma sont persistants.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-chatbot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-chatbot}
+      POSTGRES_DB: ${POSTGRES_DB:-chatbot}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-chatbot}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    image: ${REGISTRY}/agentic-chatbot-backend:latest
+    restart: always
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-chatbot}:${POSTGRES_PASSWORD:-chatbot}@db:5432/${POSTGRES_DB:-chatbot}
+      CHROMA_PATH: /data/chroma
+    volumes:
+      - chroma:/data/chroma
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    image: ${REGISTRY}/agentic-chatbot-frontend:latest
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
+  chroma:
