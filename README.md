@@ -14,9 +14,10 @@
   <img alt="AWS" src="https://img.shields.io/badge/AWS-ECR%20%7C%20EC2-FF9900?logo=amazonaws&logoColor=white">
 </p>
 
-> **Statut : Phase 9 — Tests & qualité.** 37 tests backend (couverture ~87 %),
-> linting **ruff** vert, config `pyproject.toml`. Stack dockerisée
-> (`docker compose up --build`). Prochaine étape : monitoring LangSmith
+> **Statut : Phase 10 — Monitoring LangSmith.** Tracing automatique (LLM, étapes
+> LangGraph, outils, latences, erreurs), traces étiquetées par `conversation_id`,
+> activable par `.env`. 37 tests backend (~87 %), ruff vert, stack dockerisée.
+> Prochaine étape : déploiement AWS + CI/CD
 > (voir la [roadmap](#22-améliorations-futures--roadmap)).
 
 ---
@@ -535,7 +536,25 @@ La couverture s'étend à chaque phase (services, RAG, tools, agent).
 
 ## 18. Monitoring LangSmith
 
-> _À compléter en Phase 10._ Aperçu : [`docs/monitoring.md`](docs/monitoring.md).
+LangSmith trace **automatiquement** les exécutions LangChain/LangGraph : appels
+LLM, étapes du graphe, appels d'outils, latences et erreurs. Activation par
+variables d'environnement (aucun code d'instrumentation) :
+
+```env
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=ls__...
+LANGCHAIN_PROJECT=agentic-chatbot
+```
+
+`configure_langsmith()` (appelée au démarrage) ne propage ces valeurs que si le
+tracing est activé **et** qu'une clé est fournie — sinon l'app tourne sans
+tracing (comportement par défaut, notamment en test). Chaque tour de `/chat` est
+tracé sous le nom `chat_turn`, avec les tags `agent`/`chat` et le
+`conversation_id` en métadonnée (traces filtrables par conversation).
+
+Lecture d'une trace, débogage d'un workflow agentique (pourquoi l'agent a/n'a pas
+appelé un outil, latences par nœud, erreurs d'outils) : voir
+[`docs/monitoring.md`](docs/monitoring.md).
 
 ## 19. Déploiement AWS
 
@@ -565,7 +584,7 @@ La couverture s'étend à chaque phase (services, RAG, tools, agent).
 | **7 ✅** | Frontend Next.js |
 | **8 ✅** | Dockerisation |
 | **9 ✅** | Tests & qualité |
-| 10 | Monitoring LangSmith |
+| **10 ✅** | Monitoring LangSmith |
 | 11 | Déploiement AWS + CI/CD |
 | 12 | Finalisation portfolio |
 

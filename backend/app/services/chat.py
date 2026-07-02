@@ -7,6 +7,10 @@ Pipeline d'un tour :
   4. construire les outils (RAG, mémoire, API externe) liés à cette requête ;
   5. exécuter le graphe agentique (avec routage conditionnel vers les outils) ;
   6. enregistrer et renvoyer la réponse.
+
+Observabilité : chaque exécution du graphe est étiquetée (run_name, tags,
+metadata `conversation_id`). Si LangSmith est activé, les traces sont ainsi
+filtrables par conversation.
 """
 
 from __future__ import annotations
@@ -68,7 +72,13 @@ class ChatService:
         )
 
         graph = build_agent_graph(self.model, tools)
-        result = await graph.ainvoke({"messages": context})
+        # Config d'exécution : enrichit les traces LangSmith (si activé).
+        run_config = {
+            "run_name": "chat_turn",
+            "tags": ["agent", "chat"],
+            "metadata": {"conversation_id": conversation.id},
+        }
+        result = await graph.ainvoke({"messages": context}, config=run_config)
         answer = result["messages"][-1].content
 
         assistant_message = await self.conversations.add_message(
