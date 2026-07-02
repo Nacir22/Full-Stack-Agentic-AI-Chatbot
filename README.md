@@ -14,10 +14,10 @@
   <img alt="AWS" src="https://img.shields.io/badge/AWS-ECR%20%7C%20EC2-FF9900?logo=amazonaws&logoColor=white">
 </p>
 
-> **Statut : Phase 7 — Frontend Next.js en place.** Interface de chat complète
-> (messages, historique, upload de documents, erreurs, loading) branchée sur
-> l'API via un service isolé. Backend : 30 tests verts. Prochaine étape :
-> dockerisation (voir la [roadmap](#22-améliorations-futures--roadmap)).
+> **Statut : Phase 8 — Dockerisation en place.** `docker compose up --build`
+> lance PostgreSQL + backend (migrations auto) + frontend, avec volumes
+> persistants. Backend : 30 tests verts. Prochaine étape : tests & qualité
+> (voir la [roadmap](#22-améliorations-futures--roadmap)).
 
 ---
 
@@ -227,19 +227,39 @@ npm run dev
 
 ## 11. Lancement avec Docker
 
-> _À compléter en Phase 8._ Procédure cible :
+Trois services orchestrés par `docker-compose.yml` : **PostgreSQL**, **backend**
+FastAPI, **frontend** Next.js. Un volume persiste la base, un autre l'index
+ChromaDB.
 
 ```bash
-cp .env.example .env
+cp .env.example .env        # renseigner au moins la clé LLM (OPENAI_API_KEY…)
 docker compose up --build
 ```
 
-Accès attendu :
+Accès :
 
 ```text
+Frontend    : http://localhost:3000
 Backend API : http://localhost:8000
 Swagger UI  : http://localhost:8000/docs
-Frontend    : http://localhost:3000
+```
+
+Fonctionnement :
+
+- `db` expose un healthcheck (`pg_isready`) ; le backend attend qu'elle soit
+  saine (`depends_on: condition: service_healthy`) avant de démarrer.
+- au démarrage, le backend applique les migrations (`alembic upgrade head`) puis
+  lance uvicorn ; `DATABASE_URL` et `CHROMA_PATH` sont surchargés pour pointer
+  vers le service `db` et le volume `chroma`.
+- le frontend est buildé en image **standalone** ; `NEXT_PUBLIC_API_BASE_URL`
+  est injecté au **build** (variable inlinée côté navigateur) et cible
+  `http://localhost:8000/api/v1` par défaut.
+
+Arrêt et purge des volumes :
+
+```bash
+docker compose down          # arrête
+docker compose down -v       # arrête + supprime les données (db + chroma)
 ```
 
 ## 12. Initialisation de la base de données
@@ -531,7 +551,7 @@ La couverture s'étend à chaque phase (services, RAG, tools, agent).
 | **5 ✅** | RAG ChromaDB |
 | **6 ✅** | Tools agentiques + tool calling |
 | **7 ✅** | Frontend Next.js |
-| 8 | Dockerisation |
+| **8 ✅** | Dockerisation |
 | 9 | Tests & qualité |
 | 10 | Monitoring LangSmith |
 | 11 | Déploiement AWS + CI/CD |
