@@ -15,7 +15,6 @@ from app.rag.chunking import split_text
 from app.rag.loaders import clean_text, extract_text
 from app.rag.pipeline import delete_document, ingest_text, search
 
-
 # --- Unitaires : loaders / chunking ---------------------------------------
 
 

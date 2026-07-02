@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 
-import pytest
 import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine

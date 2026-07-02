@@ -13,12 +13,12 @@ from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
 
+import app.models  # noqa: F401
 from alembic import context
 
 # Importer les modèles peuple Base.metadata (cible de l'autogénération).
 from app.core.config import get_settings
 from app.db.base import Base
-import app.models  # noqa: F401
 
 config = context.config
 

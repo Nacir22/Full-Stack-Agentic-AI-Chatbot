@@ -24,7 +24,7 @@ class User(TimestampMixin, Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     username: Mapped[str] = mapped_column(String(255), unique=True, index=True)
 
-    conversations: Mapped[list["Conversation"]] = relationship(
+    conversations: Mapped[list[Conversation]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
 

@@ -38,7 +38,7 @@ class Message(TimestampMixin, Base):
     role: Mapped[str] = mapped_column(String(16), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
 
-    conversation: Mapped["Conversation"] = relationship(back_populates="messages")
+    conversation: Mapped[Conversation] = relationship(back_populates="messages")
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<Message id={self.id} role={self.role} conv={self.conversation_id}>"

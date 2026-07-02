@@ -31,7 +31,7 @@ class ScriptedToolModel(BaseChatModel):
     def _llm_type(self) -> str:
         return "scripted-tool-model"
 
-    def bind_tools(self, tools: Any, **kwargs: Any) -> "ScriptedToolModel":
+    def bind_tools(self, tools: Any, **kwargs: Any) -> ScriptedToolModel:
         return self
 
     def _generate(

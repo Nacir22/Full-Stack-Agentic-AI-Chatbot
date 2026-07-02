@@ -24,8 +24,8 @@ class Conversation(TimestampMixin, Base):
         String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
     )
 
-    user: Mapped["User | None"] = relationship(back_populates="conversations")
-    messages: Mapped[list["Message"]] = relationship(
+    user: Mapped[User | None] = relationship(back_populates="conversations")
+    messages: Mapped[list[Message]] = relationship(
         back_populates="conversation",
         cascade="all, delete-orphan",
         order_by="Message.created_at",

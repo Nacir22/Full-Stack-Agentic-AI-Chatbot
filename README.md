@@ -14,9 +14,9 @@
   <img alt="AWS" src="https://img.shields.io/badge/AWS-ECR%20%7C%20EC2-FF9900?logo=amazonaws&logoColor=white">
 </p>
 
-> **Statut : Phase 8 — Dockerisation en place.** `docker compose up --build`
-> lance PostgreSQL + backend (migrations auto) + frontend, avec volumes
-> persistants. Backend : 30 tests verts. Prochaine étape : tests & qualité
+> **Statut : Phase 9 — Tests & qualité.** 37 tests backend (couverture ~87 %),
+> linting **ruff** vert, config `pyproject.toml`. Stack dockerisée
+> (`docker compose up --build`). Prochaine étape : monitoring LangSmith
 > (voir la [roadmap](#22-améliorations-futures--roadmap)).
 
 ---
@@ -508,16 +508,28 @@ graph LR
 
 ## 17. Tests
 
-Backend (Phases 1–6 — santé, modèles, agent `/chat`, mémoire, RAG, tools) :
+Backend — **37 tests**, couverture **~87 %**, sans clé API ni réseau (LLM et
+embeddings simulés, store en mémoire) :
 
 ```bash
 cd backend
-pytest -q
-# 30 passed
+pytest -q                                   # exécution rapide
+pytest --cov=app --cov-report=term-missing  # avec couverture
 ```
 
-Les tests de l'agent utilisent un faux modèle (`FakeListChatModel`) : aucune clé
-API ni appel réseau requis.
+Qualité du code avec **ruff** (lint + tri des imports), configuré dans
+`pyproject.toml` :
+
+```bash
+ruff check .          # vérifier
+ruff check --fix .    # corriger automatiquement
+ruff format .         # formater
+```
+
+Ce que couvrent les tests : routes (`/health`, `/chat`, `/conversations`,
+`/upload`, `/documents`), modèles et relations, mémoire (fenêtre/résumé),
+pipeline RAG (chunking, ingest, search, delete), outils, routage agentique
+(cycle `agent → tools → agent`), configuration et factories.
 
 La couverture s'étend à chaque phase (services, RAG, tools, agent).
 
@@ -552,7 +564,7 @@ La couverture s'étend à chaque phase (services, RAG, tools, agent).
 | **6 ✅** | Tools agentiques + tool calling |
 | **7 ✅** | Frontend Next.js |
 | **8 ✅** | Dockerisation |
-| 9 | Tests & qualité |
+| **9 ✅** | Tests & qualité |
 | 10 | Monitoring LangSmith |
 | 11 | Déploiement AWS + CI/CD |
 | 12 | Finalisation portfolio |
