@@ -14,11 +14,10 @@
   <img alt="AWS" src="https://img.shields.io/badge/AWS-ECR%20%7C%20EC2-FF9900?logo=amazonaws&logoColor=white">
 </p>
 
-> **Statut : Phase 11 — Déploiement AWS + CI/CD.** Workflows GitHub Actions :
-> CI (ruff + pytest + build front) et déploiement (build → push ECR → EC2 →
-> healthcheck). 37 tests backend (~87 %), stack dockerisée, monitoring LangSmith.
-> Prochaine étape : finalisation portfolio
-> (voir la [roadmap](#22-améliorations-futures--roadmap)).
+> **Statut : projet complet (12 / 12 phases).** Agent LangGraph outillé, RAG
+> ChromaDB, mémoire conversationnelle, frontend Next.js, dockerisation, 37 tests
+> (~87 %) + ruff, monitoring LangSmith, CI/CD AWS (ECR/EC2). Guide de démo :
+> [`docs/demo-guide.md`](docs/demo-guide.md).
 
 ---
 
@@ -590,8 +589,16 @@ Secrets GitHub requis : `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
 
 ## 21. Problèmes fréquents et solutions
 
-> _Enrichi au fil des phases._ Exemples anticipés : clé LLM manquante, URL de
-> base de données invalide, volume Chroma non persistant, CORS frontend↔backend.
+| Symptôme | Cause probable | Solution |
+|---|---|---|
+| `AuthenticationError` / 401 du LLM | clé API manquante ou provider incohérent | Renseigner `OPENAI_API_KEY` (ou `MISTRAL_API_KEY`) et vérifier `LLM_PROVIDER` dans `.env` |
+| `sqlite3.OperationalError: disk I/O error` | SQLite sur disque réseau/monté | Utiliser un chemin local (`DATABASE_URL=sqlite+aiosqlite:////tmp/app.db`) ou PostgreSQL |
+| `alembic ... target database is not up to date` | migrations non appliquées | `alembic upgrade head` |
+| Le frontend n'atteint pas l'API (CORS/econnrefused) | mauvaise URL ou backend éteint | Vérifier `NEXT_PUBLIC_API_BASE_URL` et `BACKEND_CORS_ORIGINS`, et que l'API tourne sur `:8000` |
+| Réponses non augmentées par les documents | aucun document indexé ou embeddings KO | Uploader un document ; vérifier `EMBEDDING_PROVIDER`/clé |
+| Index Chroma perdu au redémarrage | volume non persistant | Monter un volume sur `CHROMA_PATH` (fait dans `docker-compose`) |
+| `git: 'credential-manager-core' is not a git command` | helper renommé par Git for Windows | `git config --global credential.helper manager` |
+| Déploiement : healthcheck en échec | image cassée ou migrations échouées | Consulter les logs du conteneur backend sur l'EC2 (`docker compose logs backend`) |
 
 ## 22. Améliorations futures / Roadmap
 
@@ -609,31 +616,76 @@ Secrets GitHub requis : `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
 | **9 ✅** | Tests & qualité |
 | **10 ✅** | Monitoring LangSmith |
 | **11 ✅** | Déploiement AWS + CI/CD |
-| 12 | Finalisation portfolio |
+| **12 ✅** | Finalisation portfolio |
 
-Pistes au-delà de la v1 : streaming des réponses, authentification
-multi-utilisateur, RAG multi-collections, évaluation automatique (LangSmith
-datasets), support multimodal.
+**Les 12 phases sont terminées.** Le projet est fonctionnel de bout en bout :
+agent, RAG, mémoire, outils, frontend, Docker, tests, monitoring, CI/CD.
+
+Pistes au-delà de la v1 :
+
+- **Streaming** des réponses (token par token) côté agent et frontend.
+- **Authentification** multi-utilisateur (le modèle `User` est déjà là).
+- **RAG multi-collections** et re-ranking des passages.
+- **Évaluation automatisée** via LangSmith datasets (régression qualité).
+- **Support multimodal** (images, audio).
+- **Reverse proxy + HTTPS** et **RDS managé** en production.
 
 ## 23. Captures d'écran
 
-> _À ajouter au fil des phases (UI de chat, Swagger, traces LangSmith, console AWS)._
+Déposer les images dans [`docs/screenshots/`](docs/screenshots/) puis les
+afficher ici :
+
+```markdown
+![Interface de chat](docs/screenshots/chat.png)
+![Swagger UI](docs/screenshots/swagger.png)
+![Réponse RAG](docs/screenshots/rag.png)
+![Trace LangSmith](docs/screenshots/langsmith.png)
+![CI/CD GitHub Actions](docs/screenshots/actions.png)
+```
+
+Suggestions : l'interface de chat avec un échange, Swagger (`/docs`), une réponse
+augmentée par un document, une trace `chat_turn` LangSmith, un run réussi du
+workflow de déploiement.
 
 ## 24. Commandes utiles
 
 ```bash
-# Cloner et configurer
+# --- Démarrage ---
 git clone <repo-url> && cd Full-Stack-Agentic-AI-Chatbot
-cp .env.example .env
+cp .env.example .env                 # renseigner la clé LLM
+docker compose up --build            # tout : db + backend + frontend
 
-# (Phase 8+) Tout lancer
-docker compose up --build
+# --- Backend (sans Docker) ---
+cd backend && python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+alembic upgrade head                 # migrations
+uvicorn app.main:app --reload --port 8000
 
-# (Phase 9+) Tests
-pytest -q
+# --- Frontend (sans Docker) ---
+cd frontend && npm install && npm run dev
+
+# --- Qualité ---
+cd backend
+ruff check .                         # lint
+ruff check --fix .                   # corriger
+pytest -q                            # tests
+pytest --cov=app --cov-report=term-missing
+
+# --- Base de données ---
+alembic revision --autogenerate -m "message"   # nouvelle migration
+alembic downgrade -1                            # rollback
+
+# --- Docker ---
+docker compose down                  # arrêter
+docker compose down -v               # + purger les volumes
 ```
+
+Guide de démonstration : [`docs/demo-guide.md`](docs/demo-guide.md).
 
 ---
 
-*Projet développé par phases. Voir [`docs/architecture.md`](docs/architecture.md)
-pour les décisions techniques détaillées.*
+*Projet développé en 12 phases. Décisions techniques :
+[`docs/architecture.md`](docs/architecture.md) · Pipeline RAG :
+[`docs/rag-pipeline.md`](docs/rag-pipeline.md) · Monitoring :
+[`docs/monitoring.md`](docs/monitoring.md) · Déploiement :
+[`docs/deployment-aws.md`](docs/deployment-aws.md).*
