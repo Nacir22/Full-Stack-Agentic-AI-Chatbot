@@ -574,18 +574,36 @@ graph LR
 Pré-requis (dépôts ECR, IAM, instance EC2, `docker-compose.prod.yml` + `.env` sur
 la machine) et stratégie de rollback : [`docs/deployment-aws.md`](docs/deployment-aws.md).
 
+**Le déploiement est multi-cloud (au choix).** Le code applicatif étant
+cloud-agnostique, seule la couche déploiement change. Une variante **Azure**
+(Container Apps + ACR + PostgreSQL Flexible Server, auth OIDC) est fournie :
+[`docs/deployment-azure.md`](docs/deployment-azure.md). Correspondance :
+
+| Rôle | AWS | Azure |
+|---|---|---|
+| Registre d'images | ECR | ACR |
+| Exécution conteneurs | EC2 + compose | Azure Container Apps |
+| Base managée | RDS | PostgreSQL Flexible Server |
+| Auth CI | clés IAM | OIDC (`azure/login`) |
+
 ## 20. CI/CD GitHub Actions
 
-Deux workflows dans `.github/workflows/` :
+Trois workflows dans `.github/workflows/` :
 
 - **`ci.yml`** (push/PR) — `ruff check` + `pytest --cov` (backend) et
   `npm run build` (frontend). Garde-fou qualité avant tout merge.
-- **`deploy.yml`** (push `main` ou manuel) — build + push ECR (tags `:latest` et
-  `:<sha>`), puis déploiement EC2 avec healthcheck.
+- **`deploy.yml`** (push `main` ou manuel) — build + push **ECR**, déploiement
+  **EC2** avec healthcheck. Secrets : `AWS_ACCESS_KEY_ID`,
+  `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `PUBLIC_API_BASE_URL`, `EC2_HOST`,
+  `EC2_USER`, `EC2_SSH_KEY` — voir [`docs/deployment-aws.md`](docs/deployment-aws.md).
+- **`deploy-azure.yml`** (manuel) — build + push **ACR**, déploiement **Azure
+  Container Apps** avec healthcheck. Secrets : `AZURE_CLIENT_ID`,
+  `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_RESOURCE_GROUP`, `ACR_NAME`,
+  `PUBLIC_API_BASE_URL`, `BACKEND_URL` — voir
+  [`docs/deployment-azure.md`](docs/deployment-azure.md).
 
-Secrets GitHub requis : `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
-`AWS_REGION`, `PUBLIC_API_BASE_URL`, `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`
-(détaillés dans [`docs/deployment-aws.md`](docs/deployment-aws.md)).
+On choisit **AWS ou Azure** ; ne pas activer les deux sur le même déclencheur
+pour éviter un double déploiement (Azure est en `workflow_dispatch` manuel).
 
 ## 21. Problèmes fréquents et solutions
 

@@ -1,0 +1,79 @@
+name: Deploy to Azure (Container Apps)
+
+# Déclenchement manuel pour ne pas entrer en conflit avec le déploiement AWS
+# (qui, lui, part sur push main). Choisir l'un OU l'autre selon la cible.
+on:
+  workflow_dispatch:
+
+env:
+  IMAGE_BACKEND: agentic-chatbot-backend
+  IMAGE_FRONTEND: agentic-chatbot-frontend
+
+jobs:
+  deploy:
+    name: Build, push to ACR & deploy on Container Apps
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # requis pour le login OIDC (sans mot de passe)
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to ACR
+        run: az acr login --name ${{ secrets.ACR_NAME }}
+
+      - name: Build & push backend image
+        env:
+          REGISTRY: ${{ secrets.ACR_NAME }}.azurecr.io
+          TAG: ${{ github.sha }}
+        run: |
+          docker build -t "$REGISTRY/$IMAGE_BACKEND:$TAG" -t "$REGISTRY/$IMAGE_BACKEND:latest" ./backend
+          docker push "$REGISTRY/$IMAGE_BACKEND:$TAG"
+          docker push "$REGISTRY/$IMAGE_BACKEND:latest"
+
+      - name: Build & push frontend image
+        env:
+          REGISTRY: ${{ secrets.ACR_NAME }}.azurecr.io
+          TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_API_BASE_URL="${{ secrets.PUBLIC_API_BASE_URL }}" \
+            -t "$REGISTRY/$IMAGE_FRONTEND:$TAG" -t "$REGISTRY/$IMAGE_FRONTEND:latest" ./frontend
+          docker push "$REGISTRY/$IMAGE_FRONTEND:$TAG"
+          docker push "$REGISTRY/$IMAGE_FRONTEND:latest"
+
+      - name: Deploy backend to Container Apps
+        env:
+          REGISTRY: ${{ secrets.ACR_NAME }}.azurecr.io
+          TAG: ${{ github.sha }}
+        run: |
+          az containerapp update \
+            --name agentic-chatbot-backend \
+            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            --image "$REGISTRY/$IMAGE_BACKEND:$TAG"
+
+      - name: Deploy frontend to Container Apps
+        env:
+          REGISTRY: ${{ secrets.ACR_NAME }}.azurecr.io
+          TAG: ${{ github.sha }}
+        run: |
+          az containerapp update \
+            --name agentic-chatbot-frontend \
+            --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+            --image "$REGISTRY/$IMAGE_FRONTEND:$TAG"
+
+      - name: Healthcheck
+        run: |
+          echo "Healthcheck sur ${{ secrets.BACKEND_URL }}/health ..."
+          for i in $(seq 1 20); do
+            if curl -fsS "${{ secrets.BACKEND_URL }}/health"; then echo " -> OK"; exit 0; fi
+            sleep 6
+          done
+          echo "Healthcheck échoué après déploiement"; exit 1
